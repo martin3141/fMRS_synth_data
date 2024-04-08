@@ -3,12 +3,12 @@
 
 library(spant)
 
-seq_tr      <- 2   # set the sequence TR
-N_scans     <- 448 # just under 15 mins with TR = 2s, but still divisible by 64
-basis_lb    <- 4   # Gaussian line-broadening to simulate typical shimming
-noise_level <- 10  # frequency domain noise standard deviation added to taste
-bold_lb_hz  <- 0.2 # line-broadening in Hz from BOLD
-set.seed(1)        # random number generator seed
+seq_tr      <- 2    # set the sequence TR
+N_scans     <- 448  # just under 15 mins with TR = 2s, but still divisible by 64
+bz_inhom_lb <- 4    # Gaussian line-broadening to simulate B0 inhomogeneity
+bold_lb_hz  <- 0.2  # linewidth differences in Hz from BOLD T2* effect
+noise_level <- 10   # frequency domain noise standard deviation added to taste
+set.seed(1)         # random number generator seed
 
 # Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
 acq_paras <- def_acq_paras() # field strength could be adjusted here
@@ -91,9 +91,10 @@ for (n in 1:N_scans) {
 # convert list of spectra to a single dynamic scan and set timing parameters
 mrs_dyn_orig <- append_dyns(mrs_list) |> set_tr(seq_tr) |> set_Ntrans(N_scans) 
 
-# broaden basis apply any addition BOLD related narrowing and add noise
+# broaden basis to simulate B0 inhomogeneity, apply any addition BOLD related 
+# narrowing and add noise
 bold_lb_dyn <- (1 - bold_rf$x) * bold_lb_hz
-mrs_dyn <- mrs_dyn_orig |> lb(basis_lb) |> 
+mrs_dyn <- mrs_dyn_orig |> lb(bz_inhom_lb) |> 
   lb(bold_lb_dyn, 0) |> add_noise(noise_level)
 
 # plots
