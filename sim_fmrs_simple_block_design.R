@@ -3,8 +3,11 @@
 
 library(spant)
 
-seq_tr  <- 2   # set the sequence TR
-N_scans <- 448 # just under 15 mins with TR = 2s, but still divisible by 64
+seq_tr      <- 2   # set the sequence TR
+N_scans     <- 448 # just under 15 mins with TR = 2s, but still divisible by 64
+basis_lb    <- 4   # Gaussian line-broadening to simulate typical shimming
+noise_level <- 10  # frequency domain noise standard deviation added to taste
+set.seed(1)        # random number generator seed
 
 # Simulate a typical basis for TE=28ms semi-LASER acquisition
 brain_sim <- sim_brain_1h(full_output = TRUE, TE1 = 0.008, TE2 = 0.011,
@@ -56,22 +59,22 @@ durations <- rep(120, 2)
 labels    <- rep("x", 2)
 
 glu_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-                      rise_t = 120, fall_t = 300)$x
+                      rise_t = 120, fall_t = 150)
 
 lac_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-                      rise_t = 120, fall_t = 300)$x
+                      rise_t = 120, fall_t = 150)
 
 asp_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-                      rise_t = 120, fall_t = 300)$x
+                      rise_t = 120, fall_t = 150)
 
 glc_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-                      rise_t = 120, fall_t = 300)$x
+                      rise_t = 120, fall_t = 150)
 
 # update metabolite dataframe to have dynamic metabolite values
-amps_df$Glu <- amps_df$Glu * (glu_rf * glu_perc_change / 100 + 1)
-amps_df$Lac <- amps_df$Lac * (lac_rf * lac_perc_change / 100 + 1)
-amps_df$Asp <- amps_df$Asp * (asp_rf * asp_perc_change / 100 + 1)
-amps_df$Glc <- amps_df$Glc * (glc_rf * glc_perc_change / 100 + 1)
+amps_df$Glu <- amps_df$Glu * (glu_rf$x * glu_perc_change / 100 + 1)
+amps_df$Lac <- amps_df$Lac * (lac_rf$x * lac_perc_change / 100 + 1)
+amps_df$Asp <- amps_df$Asp * (asp_rf$x * asp_perc_change / 100 + 1)
+amps_df$Glc <- amps_df$Glc * (glc_rf$x * glc_perc_change / 100 + 1)
 
 # generate a list of spectra based on dynamic metabolite values
 mrs_list <- vector(mode = "list", length = N_scans)
@@ -84,15 +87,37 @@ for (n in 1:N_scans) {
 # convert list of spectra to a single dynamic scan and set timing parameters
 mrs_dyn_orig <- append_dyns(mrs_list) |> set_tr(seq_tr) |> set_Ntrans(N_scans) 
 
-# broaden basis by 4Hz Gaussian and add noise
-set.seed(1)
-mrs_dyn <- mrs_dyn_orig |> lb(4) |> add_noise(10)
+# broaden basis add noise
+mrs_dyn <- mrs_dyn_orig |> lb(basis_lb) |> add_noise(noise_level)
 
 # plots
 mrs_dyn |> lb(4) |> sub_mean_dyns() |> image(xlim = c(4, 0.5))
 
 mrs_dyn |> lb(4) |> mean_dyn_blocks(32) |> sub_mean_dyns() |>
                     stackplot(xlim = c(4, 0.5), y_offset = 110)
+
+# extract the task and rest spectra and plot the mean difference
+# generate a Boxcar function to describe the task
+# this isn't optimal, but maybe useful in the case where only minimal
+# assumptions can be made about the metabolite response function
+boxcar_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy, rise_t = 0,
+                         fall_t = 0)
+
+plot(boxcar_rf$time, boxcar_rf$x, type = "l")
+lines(boxcar_rf$time, glu_rf$x, col = "red")
+task_bool <- boxcar_rf$x > 0.5
+task_inds <- which(task_bool)
+rest_inds <- which(!task_bool)
+
+mean_rest <- mrs_dyn |> get_dyns(rest_inds) |> mean_dyns()
+mean_task <- mrs_dyn |> get_dyns(task_inds) |> mean_dyns()
+
+# plot the mean task and rest spectra and subtract
+subtracted <- (mean_task - mean_rest)  |> lb(4) |> scale_mrs_amp(50)
+list(subtracted, mean_task, mean_rest) |> 
+  lb(4) |> stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
+                       c("task-rest x 50", "task", "rest"), mar = c(3.5, 1, 1, 
+                                                                     6.5))
 
 # export as nifti MRS
 write_mrs(mrs_dyn, "fmrs_block.nii.gz", force = TRUE)
