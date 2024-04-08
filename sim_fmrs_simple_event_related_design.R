@@ -6,12 +6,16 @@
 
 library(spant)
 
-seq_tr  <- 2   # set the sequence TR
-N_scans <- 448 # just under 15 mins with TR = 2s, but still divisible by 64
+seq_tr      <- 2   # set the sequence TR
+N_scans     <- 448 # just under 15 mins with TR = 2s, but still divisible by 64
+basis_lb    <- 4   # Gaussian line-broadening to simulate typical shimming
+noise_level <- 100 # frequency domain noise standard deviation added to taste
+set.seed(1)        # random number generator seed
 
-# Simulate a typical basis for TE=28ms semi-LASER acquisition
-brain_sim <- sim_brain_1h(full_output = TRUE, TE1 = 0.008, TE2 = 0.011,
-                          TE3 = 0.009, pul_seq = seq_slaser_ideal)
+# Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
+acq_paras <- def_acq_paras() # field strength could be adjusted here
+brain_sim <- sim_brain_1h(acq_paras, full_output = TRUE, TE1 = 0.008,
+                          TE2 = 0.011, TE3 = 0.009, pul_seq = seq_slaser_ideal)
 
 # Use more accurate baseline concentration estimates for visual cortex from 
 # Bednarik et al 2015 Table 1. Note Ascorbate is not simulated here, but likely
@@ -74,26 +78,27 @@ for (n in 1:N_scans) {
 # convert list of spectra to a single dynamic scan and set timing parameters
 mrs_dyn_orig <- append_dyns(mrs_list) |> set_tr(seq_tr) |> set_Ntrans(N_scans) 
 
-# broaden basis by 4Hz Gaussian and add noise
-set.seed(1)
-mrs_dyn <- mrs_dyn_orig |> lb(4) |> add_noise(30)
+# broaden basis and add noise
+mrs_dyn <- mrs_dyn_orig |> lb(basis_lb) |> add_noise(noise_level)
 
 # plots
 mrs_dyn |> lb(4) |> sub_mean_dyns() |> image(xlim = c(4, 0.5))
 
 # get a vector of dynamic indices of "active" spectra
-active <- glu_rf > .5
+task_bool <- glu_rf > .5
 
-active_inds <- which(active)
-rest_inds   <- which(!active)
+task_inds <- which(task_bool)
+rest_inds   <- which(!task_bool)
 
-mean_active <- mrs_dyn |> mean_dyns(active_inds)
-mean_rest   <- mrs_dyn |> mean_dyns(rest_inds)
+mean_task <- mrs_dyn |> mean_dyns(task_inds)
+mean_rest <- mrs_dyn |> mean_dyns(rest_inds)
 
-# subtract rest from active
-diff <- (mean_active - mean_rest) |> lb(4) |> zf()
-
-plot(diff, xlim = c(4, 0.5))
+# plot the mean task and rest spectra and subtract
+subtracted <- (mean_task - mean_rest)  |> lb(4) |> scale_mrs_amp(5)
+list(subtracted, mean_rest, mean_task) |> 
+  lb(4) |> stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
+                       c("(task-rest) x 5", "rest", "task"), mar = c(3.5, 1, 1, 
+                                                                     6.5))
 
 # export as nifti MRS
 write_mrs(mrs_dyn, "fmrs_event_related.nii.gz", force = TRUE)

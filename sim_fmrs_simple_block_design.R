@@ -9,9 +9,10 @@ basis_lb    <- 4   # Gaussian line-broadening to simulate typical shimming
 noise_level <- 10  # frequency domain noise standard deviation added to taste
 set.seed(1)        # random number generator seed
 
-# Simulate a typical basis for TE=28ms semi-LASER acquisition
-brain_sim <- sim_brain_1h(full_output = TRUE, TE1 = 0.008, TE2 = 0.011,
-                          TE3 = 0.009, pul_seq = seq_slaser_ideal)
+# Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
+acq_paras <- def_acq_paras() # field strength could be adjusted here
+brain_sim <- sim_brain_1h(acq_paras, full_output = TRUE, TE1 = 0.008,
+                          TE2 = 0.011, TE3 = 0.009, pul_seq = seq_slaser_ideal)
 
 # Use more accurate baseline concentration estimates for visual cortex from 
 # Bednarik et al 2015 Table 1. Note Ascorbate is not simulated here, but likely
@@ -114,9 +115,9 @@ mean_task <- mrs_dyn |> get_dyns(task_inds) |> mean_dyns()
 
 # plot the mean task and rest spectra and subtract
 subtracted <- (mean_task - mean_rest)  |> lb(4) |> scale_mrs_amp(50)
-list(subtracted, mean_task, mean_rest) |> 
+list(subtracted, mean_rest, mean_task) |> 
   lb(4) |> stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
-                       c("task-rest x 50", "task", "rest"), mar = c(3.5, 1, 1, 
+                       c("(task-rest) x 50", "rest", "task"), mar = c(3.5, 1, 1, 
                                                                      6.5))
 
 # export as nifti MRS
