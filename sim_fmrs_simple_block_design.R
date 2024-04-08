@@ -7,7 +7,7 @@ seq_tr      <- 2   # set the sequence TR
 N_scans     <- 448 # just under 15 mins with TR = 2s, but still divisible by 64
 basis_lb    <- 4   # Gaussian line-broadening to simulate typical shimming
 noise_level <- 10  # frequency domain noise standard deviation added to taste
-bold_lb_hz  <- 0.0 # line-broadening in Hz from BOLD
+bold_lb_hz  <- 0.2 # line-broadening in Hz from BOLD
 set.seed(1)        # random number generator seed
 
 # Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
