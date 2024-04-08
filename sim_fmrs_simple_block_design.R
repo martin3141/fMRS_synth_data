@@ -1,5 +1,5 @@
 # Code to simulate an example fMRS dataset for a block design fMRS
-# experiment. Only simple line broadening and additive noise are considered.
+# experiment.
 
 library(spant)
 
@@ -7,6 +7,7 @@ seq_tr      <- 2   # set the sequence TR
 N_scans     <- 448 # just under 15 mins with TR = 2s, but still divisible by 64
 basis_lb    <- 4   # Gaussian line-broadening to simulate typical shimming
 noise_level <- 10  # frequency domain noise standard deviation added to taste
+bold_lb_hz  <- 0.0 # line-broadening in Hz from BOLD
 set.seed(1)        # random number generator seed
 
 # Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
@@ -71,6 +72,8 @@ asp_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
 glc_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
                       rise_t = 120, fall_t = 150)
 
+bold_rf <- gen_bold_rf(onsets, durations, labels, mrs_data_dummy)
+
 # update metabolite dataframe to have dynamic metabolite values
 amps_df$Glu <- amps_df$Glu * (glu_rf$x * glu_perc_change / 100 + 1)
 amps_df$Lac <- amps_df$Lac * (lac_rf$x * lac_perc_change / 100 + 1)
@@ -88,8 +91,10 @@ for (n in 1:N_scans) {
 # convert list of spectra to a single dynamic scan and set timing parameters
 mrs_dyn_orig <- append_dyns(mrs_list) |> set_tr(seq_tr) |> set_Ntrans(N_scans) 
 
-# broaden basis add noise
-mrs_dyn <- mrs_dyn_orig |> lb(basis_lb) |> add_noise(noise_level)
+# broaden basis apply any addition BOLD related narrowing and add noise
+bold_lb_dyn <- (1 - bold_rf$x) * bold_lb_hz
+mrs_dyn <- mrs_dyn_orig |> lb(basis_lb) |> 
+  lb(bold_lb_dyn, 0) |> add_noise(noise_level)
 
 # plots
 mrs_dyn |> lb(4) |> sub_mean_dyns() |> image(xlim = c(4, 0.5))
@@ -106,6 +111,8 @@ boxcar_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy, rise_t = 0,
 
 plot(boxcar_rf$time, boxcar_rf$x, type = "l")
 lines(boxcar_rf$time, glu_rf$x, col = "red")
+lines(boxcar_rf$time, bold_rf$x, col = "blue")
+
 task_bool <- boxcar_rf$x > .5
 task_inds <- which(task_bool)
 rest_inds <- which(!task_bool)

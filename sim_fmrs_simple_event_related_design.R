@@ -1,8 +1,7 @@
 # Code to simulate an example dataset for an event-related design fMRS
 # experiment. One second duration stimuli are modeled at 20 second
 # intervals. The glutamate response function (GRF) is modeled as a smoothed
-# trapezoid lasting approximately 2.5 seconds (Mullins 2018). Only simple line
-# broadening and additive noise are considered.
+# trapezoid lasting approximately 2.5 seconds (Mullins 2018).
 
 library(spant)
 
@@ -10,6 +9,7 @@ seq_tr      <- 2   # set the sequence TR
 N_scans     <- 448 # just under 15 mins with TR = 2s, but still divisible by 64
 basis_lb    <- 4   # Gaussian line-broadening to simulate typical shimming
 noise_level <- 100 # frequency domain noise standard deviation added to taste
+bold_lb_hz  <- 0.0 # line-broadening in Hz from BOLD
 set.seed(1)        # random number generator seed
 
 # Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
@@ -64,6 +64,8 @@ gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
 glu_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy, rise_t = 0.25,
                       fall_t = 1.0, smo_sigma = 0.2)$x
 
+bold_rf <- gen_bold_rf(onsets, durations, labels, mrs_data_dummy)
+
 # update metabolite dataframe to have dynamic metabolite values
 amps_df$Glu <- amps_df$Glu * (glu_rf * glu_perc_change / 100 + 1)
 
@@ -78,8 +80,10 @@ for (n in 1:N_scans) {
 # convert list of spectra to a single dynamic scan and set timing parameters
 mrs_dyn_orig <- append_dyns(mrs_list) |> set_tr(seq_tr) |> set_Ntrans(N_scans) 
 
-# broaden basis and add noise
-mrs_dyn <- mrs_dyn_orig |> lb(basis_lb) |> add_noise(noise_level)
+# broaden basis apply any addition BOLD related narrowing and add noise
+bold_lb_dyn <- (1 - bold_rf$x) * bold_lb_hz
+mrs_dyn <- mrs_dyn_orig |> lb(basis_lb) |> 
+  lb(bold_lb_dyn, 0) |> add_noise(noise_level)
 
 # plots
 mrs_dyn |> lb(4) |> sub_mean_dyns() |> image(xlim = c(4, 0.5))
