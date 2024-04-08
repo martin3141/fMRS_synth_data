@@ -88,17 +88,16 @@ mrs_dyn |> lb(4) |> sub_mean_dyns() |> image(xlim = c(4, 0.5))
 task_bool <- glu_rf > .5
 
 task_inds <- which(task_bool)
-rest_inds   <- which(!task_bool)
+rest_inds <- which(!task_bool)
 
 mean_task <- mrs_dyn |> mean_dyns(task_inds)
 mean_rest <- mrs_dyn |> mean_dyns(rest_inds)
 
 # plot the mean task and rest spectra and subtract
 subtracted <- (mean_task - mean_rest)  |> lb(4) |> scale_mrs_amp(5)
-list(subtracted, mean_rest, mean_task) |> 
-  lb(4) |> stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
-                       c("(task-rest) x 5", "rest", "task"), mar = c(3.5, 1, 1, 
-                                                                     6.5))
+list(subtracted, mean_rest, mean_task) |> lb(4) |> 
+  stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
+              c("(task-rest) x 5", "rest", "task"), mar = c(3.5, 1, 1, 6.5))
 
 # export as nifti MRS
 write_mrs(mrs_dyn, "fmrs_event_related.nii.gz", force = TRUE)

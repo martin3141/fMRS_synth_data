@@ -106,7 +106,7 @@ boxcar_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy, rise_t = 0,
 
 plot(boxcar_rf$time, boxcar_rf$x, type = "l")
 lines(boxcar_rf$time, glu_rf$x, col = "red")
-task_bool <- boxcar_rf$x > 0.5
+task_bool <- boxcar_rf$x > .5
 task_inds <- which(task_bool)
 rest_inds <- which(!task_bool)
 
@@ -115,10 +115,10 @@ mean_task <- mrs_dyn |> get_dyns(task_inds) |> mean_dyns()
 
 # plot the mean task and rest spectra and subtract
 subtracted <- (mean_task - mean_rest)  |> lb(4) |> scale_mrs_amp(50)
-list(subtracted, mean_rest, mean_task) |> 
-  lb(4) |> stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
-                       c("(task-rest) x 50", "rest", "task"), mar = c(3.5, 1, 1, 
-                                                                     6.5))
+list(subtracted, mean_rest, mean_task) |> lb(4) |>
+  stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
+                       c("(task-rest) x 50", "rest", "task"),
+            mar = c(3.5, 1, 1, 6.5))
 
 # export as nifti MRS
 write_mrs(mrs_dyn, "fmrs_block.nii.gz", force = TRUE)
