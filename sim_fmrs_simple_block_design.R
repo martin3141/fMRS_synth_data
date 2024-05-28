@@ -13,15 +13,16 @@ set.seed(1)         # random number generator seed
 # Make a data frame containing a single row of basis signal amplitudes.
 # Metabolite values are for visual cortex listed in Bednarik et al 2015 Table 1.
 # Note Alanine and Glycine are not listed in the table and therefore set to 0.
-basis_amps <- data.frame("ala" = 0.00, "asc" = 0.96, "asp" = 3.58, "cr" = 4.22,
-                         "gaba" = 1.03, "glc" = 0.62, "gln" = 2.79,
-                         "gly" = 0.00, "gsh" = 1.09, "glu" = 8.59, "gpc" = 0.54,
-                         "ins" = 6.08, "lac" = 1.01, "naa" = 11.90,
-                         "naag" = 1.32, "pch" = 0.40, "pcr" = 3.34,
-                         "peth" = 0.93, "sins" = 0.27, "tau" = 1.27,
-                         "lip09" = 0.00, "lip13a" = 0.00, "lip13b" = 0.00,
-                         "lip20" = 0.00, "mm09" = 4.00, "mm12" = 4.00,
-                         "mm14" = 4.00, "mm17"= 4.00, "mm20" = 4.00)
+basis_amps <- data.frame("ala"    = 0.00, "asc"    = 0.96, "asp"   = 3.58,
+                         "cr"     = 4.22, "gaba"   = 1.03, "glc"   = 0.62,
+                         "gln"    = 2.79, "gly"    = 0.00, "gsh"   = 1.09,
+                         "glu"    = 8.59, "gpc"    = 0.54, "ins"   = 6.08,
+                         "lac"    = 1.01, "naa"    = 11.9, "naag"  = 1.32,
+                         "pch"    = 0.40, "pcr"    = 3.34, "peth"  = 0.93,
+                         "sins"   = 0.27, "tau"    = 1.27, "lip09" = 0.00,
+                         "lip13a" = 0.00, "lip13b" = 0.00, "lip20" = 0.00,
+                         "mm09"   = 4.00, "mm12"   = 4.00, "mm14"  = 4.00,
+                         "mm17"   = 4.00, "mm20"   = 4.00)
 
 # Duplicate the row N_scans times
 basis_amps <- basis_amps[rep(1, N_scans),]
