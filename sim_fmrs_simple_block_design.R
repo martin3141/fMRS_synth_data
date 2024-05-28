@@ -63,7 +63,7 @@ basis_amps$lac <- basis_amps$lac * (lac_rf$stim * lac_perc_change / 100 + 1)
 basis_amps$asp <- basis_amps$asp * (asp_rf$stim * asp_perc_change / 100 + 1)
 basis_amps$glc <- basis_amps$glc * (glc_rf$stim * glc_perc_change / 100 + 1)
 
-# aimulate a typical basis for TE=28ms semi-LASER acquisition at 3T
+# simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
 acq_paras <- def_acq_paras(ft = 127.8e6)
 basis     <- sim_basis(names(basis_amps), pul_seq = seq_slaser_ideal,
                        TE1 = 0.008, TE2 = 0.011, TE3 = 0.009)
@@ -76,6 +76,9 @@ mrs_dyn_orig <- basis2dyn_mrs_data(basis, basis_amps, seq_tr)
 bold_lb_dyn <- (1 - bold_rf$stim_bold) * bold_lb_hz
 mrs_dyn <- mrs_dyn_orig |> lb(bz_inhom_lb) |>  lb(bold_lb_dyn, 0) |>
   add_noise(noise_level)
+
+# export as nifti MRS
+write_mrs(mrs_dyn, "fmrs_block.nii.gz", force = TRUE)
 
 # plots
 mrs_dyn |> lb(4) |> sub_mean_dyns() |> image(xlim = c(4, 0.5))
@@ -107,6 +110,3 @@ list(subtracted, mean_rest, mean_task) |> lb(4) |>
   stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
                        c("(task-rest) x 50", "rest", "task"),
             mar = c(3.5, 1, 1, 6.5))
-
-# export as nifti MRS
-write_mrs(mrs_dyn, "fmrs_block.nii.gz", force = TRUE)
