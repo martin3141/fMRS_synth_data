@@ -24,16 +24,8 @@ basis_amps <- data.frame("ala"    = 0.00, "asc"    = 0.96, "asp"   = 3.58,
                          "mm09"   = 4.00, "mm12"   = 4.00, "mm14"  = 4.00,
                          "mm17"   = 4.00, "mm20"   = 4.00)
 
-# Duplicate the row N_scans times
+# Duplicate the row N_scans times to make a table of values
 basis_amps <- basis_amps[rep(1, N_scans),]
-
-# Update the amplitudes according to predicted dynamics
-
-# From Bednarik et at 2015 Table 1.
-lac_perc_change <-  29.6
-glu_perc_change <-  3.3
-glc_perc_change <- -16.0
-asp_perc_change <- -5.4
 
 # simulate two 120 second blocks of stimulation starting at 100 and 500 seconds
 onsets    <- c(100, 500)
@@ -57,6 +49,13 @@ glc_rf <- gen_trap_reg(onsets, durations, mrs_data = mrs_data_dummy,
                        rise_t = 120, fall_t = 150)
 
 bold_rf <- gen_bold_reg(onsets, durations, mrs_data = mrs_data_dummy)
+
+# Update the amplitudes according to predicted changes from Bednarik et at 2015
+# Table 1.
+lac_perc_change <-  29.6
+glu_perc_change <-  3.3
+glc_perc_change <- -16.0
+asp_perc_change <- -5.4
 
 # update metabolite data frame to have dynamic metabolite values
 basis_amps$glu <- basis_amps$glu * (glu_rf$stim * glu_perc_change / 100 + 1)
