@@ -10,6 +10,49 @@ bold_lb_hz  <- 0.2  # linewidth differences in Hz from BOLD T2* effect
 noise_level <- 10   # frequency domain noise standard deviation added to taste
 set.seed(1)         # random number generator seed
 
+# Make a data frame containing a single row of basis signal amplitudes.
+# Metabolite values are for visual cortex listed in Bednarik et al 2015 Table 1.
+# Note Alanine and Glycine are not listed in the table and therefore set to 0.
+basis_amps <- data.frame("ala" = 0, "asc" = 0.96, "asp" = 3.58, "cr" = 4.22,
+                         "gaba" = 1.03, "glc" = 0.62, "gln" = 2.79,
+                         "gly" = 0.00, "gsh" = 1.09, "glu" = 8.59, "gpc" = 0.54,
+                         "ins" = 6.08, "lac" = 1.01, "naa" = 11.9,
+                         "naag" = 1.32, "pch" = 0.40, "pcr" = 3.34,
+                         "peth" = 0.93, "sins" = 0.27, "tau" = 1.27,
+                         "lip09" = 0, "lip13a" = 0, "lip13b" = 0, "lip20" = 0,
+                         "mm09" = 4, "mm12" = 4, "mm14" = 4, "mm17"= 4,
+                         "mm20" = 4)
+
+# Duplicate the row N_scans times
+basis_amps <- basis_amps[rep(1, N_scans),]
+
+# Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
+acq_paras <- def_acq_paras(ft = 127.8e6)
+basis     <- sim_basis(names(basis_amps), pul_seq = seq_slaser_ideal,
+                       TE1 = 0.008, TE2 = 0.011, TE3 = 0.009)
+
+mrs_dyn_orig <- basis2dyn_mrs_data(basis, basis_amps, seq_tr)
+
+
+break
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# XXXX
+mrs_data <- basis2mrs_data(basis, amps = basis_amps, sum_elements = TRUE)
+
+
 # Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
 acq_paras <- def_acq_paras() # field strength could be adjusted here
 brain_sim <- sim_brain_1h(acq_paras, full_output = TRUE, TE1 = 0.008,
@@ -45,7 +88,7 @@ glu_perc_change <-  3.3
 glc_perc_change <- -16.0
 asp_perc_change <- -5.4
 
-# generate a dataframe of baseline metabolite level for each dynamic scan
+# generate a data frame of baseline metabolite level for each dynamic scan
 amps_df <- data.frame(t(amps))
 amps_df <- amps_df[rep(1, N_scans),]
 
@@ -60,21 +103,21 @@ onsets    <- c(100, 500)
 durations <- rep(120, 2)
 labels    <- rep("x", 2)
 
-glu_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-                      rise_t = 120, fall_t = 150)
+glu_rf <- gen_trap_reg(onsets, durations, labels, mrs_data_dummy,
+                       rise_t = 120, fall_t = 150)
 
-lac_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-                      rise_t = 120, fall_t = 150)
+lac_rf <- gen_trap_reg(onsets, durations, labels, mrs_data_dummy,
+                       rise_t = 120, fall_t = 150)
 
-asp_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-                      rise_t = 120, fall_t = 150)
+asp_rf <- gen_trap_reg(onsets, durations, labels, mrs_data_dummy,
+                       rise_t = 120, fall_t = 150)
 
-glc_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-                      rise_t = 120, fall_t = 150)
+glc_rf <- gen_trap_reg(onsets, durations, labels, mrs_data_dummy,
+                       rise_t = 120, fall_t = 150)
 
-bold_rf <- gen_bold_rf(onsets, durations, labels, mrs_data_dummy)
+bold_rf <- gen_bold_reg(onsets, durations, labels, mrs_data_dummy)
 
-# update metabolite dataframe to have dynamic metabolite values
+# update metabolite data frame to have dynamic metabolite values
 amps_df$Glu <- amps_df$Glu * (glu_rf$x * glu_perc_change / 100 + 1)
 amps_df$Lac <- amps_df$Lac * (lac_rf$x * lac_perc_change / 100 + 1)
 amps_df$Asp <- amps_df$Asp * (asp_rf$x * asp_perc_change / 100 + 1)
@@ -107,8 +150,8 @@ mrs_dyn |> lb(4) |> mean_dyn_blocks(32) |> sub_mean_dyns() |>
 # generate a Boxcar function to describe the task
 # this isn't optimal, but maybe useful in the case where only minimal
 # assumptions can be made about the metabolite response function
-boxcar_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy, rise_t = 0,
-                         fall_t = 0)
+boxcar_rf <- gen_trap_reg(onsets, durations, labels, mrs_data_dummy, rise_t = 0,
+                          fall_t = 0)
 
 plot(boxcar_rf$time, boxcar_rf$x, type = "l")
 lines(boxcar_rf$time, glu_rf$x, col = "red")
