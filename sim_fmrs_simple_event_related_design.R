@@ -8,101 +8,75 @@ library(spant)
 seq_tr      <- 2    # set the sequence TR
 N_scans     <- 448  # just under 15 mins with TR = 2s, but still divisible by 64
 bz_inhom_lb <- 4    # Gaussian line-broadening to simulate B0 inhomogeneity
-bold_lb_hz  <- 0.2  # linewidth differences in Hz from BOLD T2* effect
-noise_level <- 100  # frequency domain noise standard deviation added to taste
+bold_lb_hz  <- 0.0  # linewidth differences in Hz from BOLD T2* effect
+ss_spec_snr <- 15   # single shot spectral SNR
+subjects    <- 2    # number of subject scans to generate in BIDS format
+runs        <- 2    # number of runs to generate in BIDS format
 set.seed(1)         # random number generator seed
 
-# Simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
-acq_paras <- def_acq_paras() # field strength could be adjusted here
-brain_sim <- sim_brain_1h(acq_paras, full_output = TRUE, TE1 = 0.008,
-                          TE2 = 0.011, TE3 = 0.009, pul_seq = seq_slaser_ideal)
+# Make a data frame containing a single row of basis signal amplitudes.
+# Metabolite values are for visual cortex listed in Bednarik et al 2015 Table 1.
+# Note Alanine and Glycine are not listed in the table and therefore set to 0.
+basis_amps <- data.frame("ala"    = 0.00, "asc"    = 0.96, "asp"   = 3.58,
+                         "cr"     = 4.22, "gaba"   = 1.03, "glc"   = 0.62,
+                         "gln"    = 2.79, "gly"    = 0.00, "gsh"   = 1.09,
+                         "glu"    = 8.59, "gpc"    = 0.54, "ins"   = 6.08,
+                         "lac"    = 1.01, "naa"    = 11.9, "naag"  = 1.32,
+                         "pch"    = 0.40, "pcr"    = 3.34, "peth"  = 0.93,
+                         "sins"   = 0.27, "tau"    = 1.27, "lip09" = 0.00,
+                         "lip13a" = 0.00, "lip13b" = 0.00, "lip20" = 0.00,
+                         "mm09"   = 4.00, "mm12"   = 4.00, "mm14"  = 4.00,
+                         "mm17"   = 4.00, "mm20"   = 4.00)
 
-# Use more accurate baseline concentration estimates for visual cortex from 
-# Bednarik et al 2015 Table 1. Note Ascorbate is not simulated here, but likely
-# small enough to ignore at 3T.
-amps  <- brain_sim$amps
-amps["Ala"]  <- 0.00 # not listed in Bednarik et al, so set to zero
-amps["Asp"]  <- 3.58
-amps["Cr"]   <- 4.22
-amps["GABA"] <- 1.03
-amps["Glc"]  <- 0.62
-amps["Gln"]  <- 2.79
-amps["Gly"]  <- 0.00 # not listed in Bednarik et al, so set to zero
-amps["GSH"]  <- 1.09
-amps["Glu"]  <- 8.59
-amps["GPC"]  <- 0.54
-amps["Ins"]  <- 6.08
-amps["Lac"]  <- 1.01
-amps["NAA"]  <- 6.08
-amps["NAAG"] <- 1.32
-amps["PCh"]  <- 0.40
-amps["PCr"]  <- 3.34
-amps["PEth"] <- 0.93
-amps["sIns"] <- 0.27
-amps["Tau"]  <- 1.27
+# Duplicate the row N_scans times to make a table of values
+basis_amps <- basis_amps[rep(1, N_scans),]
+
+onsets    <- seq(from = 19.5, to = 860, by = 20)
+durations <- rep(1.0, length(onsets))
+
+# generate a dummy mrs_data object for generating the regressors
+mrs_data_dummy <- sim_zero(dyns = N_scans) |> set_tr(seq_tr) |>
+                  set_Ntrans(N_scans)
+
+# tentative gamma distribution model of the glutamate response function 
+get_glu_rf <- function() {
+  t <- seq(from = 0, to = 4, by = 0.05)
+  resp_fn <- dgamma(t, 2.5, 3.0)
+  resp_fn <- resp_fn / sum(resp_fn)
+  return(data.frame(t, resp_fn))
+}
+
+glu_rf <- gen_conv_reg(onsets, resp_fn = get_glu_rf(),
+                       mrs_data = mrs_data_dummy, normalise = TRUE)
+
+bold_rf <- gen_bold_reg(onsets, durations, mrs_data = mrs_data_dummy)
 
 # From Yakovlev et al 2022
 glu_perc_change <- 14.0
 
-# generate a dataframe of baseline metabolite level for each dynamic scan
-amps_df <- data.frame(t(amps))
-amps_df <- amps_df[rep(1, N_scans),]
-
-# generate a dummy mrs_data object to aid metabolite response fn generation
-mrs_data_dummy <- brain_sim$mrs_data |> set_tr(seq_tr) |> set_Ntrans(N_scans) |>
-                  rep_dyn(N_scans)
-
-onsets    <- seq(from = 19.3, to = 860, by = 20)
-durations <- rep(1.0, length(onsets))
-labels    <- rep("x", length(onsets))
-
-# high temporal resolution GRF plot
-gen_trap_rf(onsets, durations, labels, mrs_data_dummy,
-          rise_t = 0.25, fall_t = 1.0, match_tr = FALSE, smo_sigma = 0.2) |> 
-  plot(type = "l", xlim = c(0, 90), ylab = "GRF")
-
-glu_rf <- gen_trap_rf(onsets, durations, labels, mrs_data_dummy, rise_t = 0.25,
-                      fall_t = 1.0, smo_sigma = 0.2)$x
-
-bold_rf <- gen_bold_rf(onsets, durations, labels, mrs_data_dummy)
-
 # update metabolite dataframe to have dynamic metabolite values
-amps_df$Glu <- amps_df$Glu * (glu_rf * glu_perc_change / 100 + 1)
+basis_amps$glu <- basis_amps$glu * 
+                  (glu_rf$stim_conv * glu_perc_change / 100 + 1)
 
-# generate a list of spectra based on dynamic metabolite values
-mrs_list <- vector(mode = "list", length = N_scans)
-for (n in 1:N_scans) {
-  amps_n <- amps_df[n,] |> as.numeric()
-  mrs_list[[n]] <- basis2mrs_data(brain_sim$basis, sum_elements = TRUE,
-                                  amps = amps_n)
-}
+# simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
+acq_paras <- def_acq_paras(ft = 127.8e6)
+basis     <- sim_basis(names(basis_amps), pul_seq = seq_slaser_ideal,
+                       TE1 = 0.008, TE2 = 0.011, TE3 = 0.009)
 
-# convert list of spectra to a single dynamic scan and set timing parameters
-mrs_dyn_orig <- append_dyns(mrs_list) |> set_tr(seq_tr) |> set_Ntrans(N_scans) 
+# apply basis amplitudes to the basis set to generate a simulated fMRS dataset
+mrs_dyn_orig <- basis2dyn_mrs_data(basis, basis_amps, seq_tr)
 
 # broaden basis to simulate B0 inhomogeneity, apply any addition BOLD related 
-# narrowing and add noise
-bold_lb_dyn <- (1 - bold_rf$x) * bold_lb_hz
-mrs_dyn <- mrs_dyn_orig |> lb(bz_inhom_lb) |> 
-  lb(bold_lb_dyn, 0) |> add_noise(noise_level)
+# narrowing
+bold_lb_dyn <- (1 - bold_rf$stim_bold) * bold_lb_hz
+mrs_dyn     <- mrs_dyn_orig |> lb(bz_inhom_lb) |> lb(bold_lb_dyn, 0)
 
-# plots
-mrs_dyn |> lb(4) |> sub_mean_dyns() |> image(xlim = c(4, 0.5))
+# duplicate the data to generate multiple subjects and runs with different noise
+# samples
+mrs_dyn_list <- rep(list(mrs_dyn), subjects * runs)
 
-# get a vector of dynamic indices of "active" spectra
-task_bool <- glu_rf > .5
+# add noise
+mrs_dyn_list <- mrs_dyn_list |> add_noise_spec_snr(ss_spec_snr)
 
-task_inds <- which(task_bool)
-rest_inds <- which(!task_bool)
-
-mean_task <- mrs_dyn |> mean_dyns(task_inds)
-mean_rest <- mrs_dyn |> mean_dyns(rest_inds)
-
-# plot the mean task and rest spectra and subtract
-subtracted <- (mean_task - mean_rest)  |> lb(4) |> scale_mrs_amp(5)
-list(subtracted, mean_rest, mean_task) |> lb(4) |> 
-  stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
-              c("(task-rest) x 5", "rest", "task"), mar = c(3.5, 1, 1, 6.5))
-
-# export as nifti MRS
-write_mrs(mrs_dyn, "fmrs_event_related.nii.gz", force = TRUE)
+# export to BIDS structure
+mrs_data_list2bids(mrs_dyn_list, "~/fmrs_event_related_bids", runs = runs)

@@ -1,5 +1,5 @@
-# Code to simulate an example fMRS dataset for a block design fMRS
-# experiment.
+# Code to simulate an example fMRS dataset for a block design fMRS experiment
+# and export a BIDS structure
 
 library(spant)
 
@@ -7,8 +7,10 @@ seq_tr      <- 2    # set the sequence TR
 N_scans     <- 448  # just under 15 mins with TR = 2s, but still divisible by 64
 bz_inhom_lb <- 4    # Gaussian line-broadening to simulate B0 inhomogeneity
 bold_lb_hz  <- 0.0  # linewidth differences in Hz from BOLD T2* effect
-noise_level <- 10   # frequency domain noise standard deviation added to taste
-set.seed(1)         # random number generator seed
+ss_spec_snr <- 10   # single shot spectral SNR
+subjects    <- 2    # number of subject scans to generate in BIDS format
+runs        <- 2    # number of runs to generate in BIDS format
+set.seed(1)         # random number generator seed used for noise samples
 
 # Make a data frame containing a single row of basis signal amplitudes.
 # Metabolite values are for visual cortex listed in Bednarik et al 2015 Table 1.
@@ -32,8 +34,8 @@ onsets    <- c(100, 500)
 durations <- rep(120, 2)
 
 # generate a dummy mrs_data object for generating the regressors
-mrs_data_dummy <- sim_resonances() |> set_tr(seq_tr) |> set_Ntrans(N_scans) |>
-                  rep_dyn(N_scans)
+mrs_data_dummy <- sim_zero(dyns = N_scans) |> set_tr(seq_tr) |>
+                  set_Ntrans(N_scans)
 
 # generate metabolite response functions assuming simple trapezoidal shapes
 glu_rf <- gen_trap_reg(onsets, durations, mrs_data = mrs_data_dummy,
@@ -50,8 +52,8 @@ glc_rf <- gen_trap_reg(onsets, durations, mrs_data = mrs_data_dummy,
 
 bold_rf <- gen_bold_reg(onsets, durations, mrs_data = mrs_data_dummy)
 
-# Update the amplitudes according to predicted changes from Bednarik et at 2015
-# Table 1.
+# update the amplitudes according to predicted changes from Bednarik et at 2015
+# Table 1
 lac_perc_change <-  29.6
 glu_perc_change <-  3.3
 glc_perc_change <- -16.0
@@ -72,41 +74,16 @@ basis     <- sim_basis(names(basis_amps), pul_seq = seq_slaser_ideal,
 mrs_dyn_orig <- basis2dyn_mrs_data(basis, basis_amps, seq_tr)
 
 # broaden basis to simulate B0 inhomogeneity, apply any addition BOLD related 
-# narrowing and add noise
+# narrowing
 bold_lb_dyn <- (1 - bold_rf$stim_bold) * bold_lb_hz
-mrs_dyn <- mrs_dyn_orig |> lb(bz_inhom_lb) |>  lb(bold_lb_dyn, 0) |>
-  add_noise(noise_level)
+mrs_dyn     <- mrs_dyn_orig |> lb(bz_inhom_lb) |> lb(bold_lb_dyn, 0) 
 
-# export as nifti MRS
-write_mrs(mrs_dyn, "fmrs_block.nii.gz", force = TRUE)
+# duplicate the data to generate multiple subjects and runs with different noise
+# samples
+mrs_dyn_list <- rep(list(mrs_dyn), subjects * runs)
 
-# plots
-mrs_dyn |> lb(4) |> sub_mean_dyns() |> image(xlim = c(4, 0.5))
+# add noise
+mrs_dyn_list <- mrs_dyn_list |> add_noise_spec_snr(ss_spec_snr)
 
-mrs_dyn |> lb(4) |> mean_dyn_blocks(32) |> sub_mean_dyns() |>
-                    stackplot(xlim = c(4, 0.5), y_offset = 110)
-
-# extract the task and rest spectra and plot the mean difference
-# generate a Boxcar function to describe the task
-# this isn't optimal, but maybe useful in the case where only minimal
-# assumptions can be made about the metabolite response function
-boxcar_rf <- gen_trap_reg(onsets, durations, mrs_data = mrs_data_dummy,
-                          rise_t = 0, fall_t = 0)
-
-plot(boxcar_rf$time, boxcar_rf$stim, type = "l")
-lines(boxcar_rf$time, glu_rf$stim, col = "red")
-lines(boxcar_rf$time, bold_rf$stim_bold, col = "blue")
-
-task_bool <- boxcar_rf$stim > .5
-task_inds <- which(task_bool)
-rest_inds <- which(!task_bool)
-
-mean_rest <- mrs_dyn |> get_dyns(rest_inds) |> mean_dyns()
-mean_task <- mrs_dyn |> get_dyns(task_inds) |> mean_dyns()
-
-# plot the mean task and rest spectra and subtract
-subtracted <- (mean_task - mean_rest)  |> lb(4) |> scale_mrs_amp(50)
-list(subtracted, mean_rest, mean_task) |> lb(4) |>
-  stackplot(xlim = c(4, 0.5), y_offset = 20, labels = 
-                       c("(task-rest) x 50", "rest", "task"),
-            mar = c(3.5, 1, 1, 6.5))
+# export to BIDS structure
+mrs_data_list2bids(mrs_dyn_list, "~/fmrs_block_bids", runs = runs)
