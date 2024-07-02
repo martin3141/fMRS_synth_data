@@ -10,8 +10,7 @@ N_scans     <- 448  # just under 15 mins with TR = 2s, but still divisible by 64
 bz_inhom_lb <- 4    # Gaussian line-broadening to simulate B0 inhomogeneity
 bold_lb_hz  <- 0.0  # linewidth differences in Hz from BOLD T2* effect
 ss_spec_snr <- 15   # single shot spectral SNR
-subjects    <- 2    # number of subject scans to generate in BIDS format
-runs        <- 2    # number of runs to generate in BIDS format
+subjects    <- 4    # number of subject scans to generate in BIDS format
 set.seed(1)         # random number generator seed
 
 # Make a data frame containing a single row of basis signal amplitudes.
@@ -71,12 +70,11 @@ mrs_dyn_orig <- basis2dyn_mrs_data(basis, basis_amps, seq_tr)
 bold_lb_dyn <- (1 - bold_rf$stim_bold) * bold_lb_hz
 mrs_dyn     <- mrs_dyn_orig |> lb(bz_inhom_lb) |> lb(bold_lb_dyn, 0)
 
-# duplicate the data to generate multiple subjects and runs with different noise
-# samples
-mrs_dyn_list <- rep(list(mrs_dyn), subjects * runs)
+# duplicate the data to generate multiple subjects and with different noise samples
+mrs_dyn_list <- rep(list(mrs_dyn), subjects)
 
 # add noise
 mrs_dyn_list <- mrs_dyn_list |> add_noise_spec_snr(ss_spec_snr)
 
 # export to BIDS structure
-mrs_data_list2bids(mrs_dyn_list, "~/fmrs_event_related_bids", runs = runs)
+mrs_data2bids(mrs_dyn_list, "~/fmrs_even_related_bids")
