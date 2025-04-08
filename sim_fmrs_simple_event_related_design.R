@@ -60,7 +60,8 @@ basis_amps$glu <- basis_amps$glu *
 # simulate a typical basis for TE=28ms semi-LASER acquisition at 3T
 acq_paras <- def_acq_paras(ft = 127.8e6)
 basis     <- sim_basis(names(basis_amps), pul_seq = seq_slaser_ideal,
-                       TE1 = 0.008, TE2 = 0.011, TE3 = 0.009)
+                       TE1 = 0.008, TE2 = 0.011, TE3 = 0.009,
+                       acq_paras = acq_paras)
 
 # apply basis amplitudes to the basis set to generate a simulated fMRS dataset
 mrs_dyn_orig <- basis2dyn_mrs_data(basis, basis_amps, seq_tr)
